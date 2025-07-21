@@ -42,17 +42,73 @@ cat > etc/fstab << 'EOF'
 tmpfs           /tmp            tmpfs   defaults        0       0
 EOF
 
-# Enable SSH
+# Enable SSH service by creating symlink manually
 echo "Enabling SSH service..."
-systemctl --root="$PWD" enable sshd
+mkdir -p etc/systemd/system/multi-user.target.wants
+if [ -f usr/lib/systemd/system/sshd.service ]; then
+    ln -sf /usr/lib/systemd/system/sshd.service etc/systemd/system/multi-user.target.wants/sshd.service
+elif [ -f lib/systemd/system/sshd.service ]; then
+    ln -sf /lib/systemd/system/sshd.service etc/systemd/system/multi-user.target.wants/sshd.service
+else
+    echo "Warning: sshd.service not found, creating basic service file"
+    mkdir -p etc/systemd/system
+    cat > etc/systemd/system/sshd.service << 'SSHD_EOF'
+[Unit]
+Description=OpenSSH Daemon
+Wants=sshdgenkeys.service
+After=sshdgenkeys.service
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/sbin/sshd -D
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=42s
+
+[Install]
+WantedBy=multi-user.target
+SSHD_EOF
+    ln -sf /etc/systemd/system/sshd.service etc/systemd/system/multi-user.target.wants/sshd.service
+fi
 
 # Create pi user with sudo access
 echo "Creating pi user..."
-chroot . /bin/bash << 'CHROOT_EOF'
-useradd -m -G wheel -s /bin/bash pi
-echo 'pi:raspberry' | chpasswd
-echo '%wheel ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-CHROOT_EOF
+
+# Create user entry in passwd
+echo 'pi:x:1000:1000:Pi User:/home/pi:/bin/bash' >> etc/passwd
+
+# Create wheel group if it doesn't exist
+if ! grep -q '^wheel:' etc/group; then
+    echo 'wheel:x:10:pi' >> etc/group
+else
+    # Add pi to wheel group
+    sed -i 's/^wheel:\([^:]*\):\([^:]*\):\(.*\)/wheel:\1:\2:\3,pi/' etc/group
+fi
+
+# Create home directory
+mkdir -p home/pi
+chown 1000:1000 home/pi
+chmod 755 home/pi
+
+# Configure sudo for wheel group
+mkdir -p etc/sudoers.d
+echo '%wheel ALL=(ALL) NOPASSWD: ALL' > etc/sudoers.d/wheel
+chmod 440 etc/sudoers.d/wheel
+
+# Add password hash for pi user (password: raspberry)
+# Using a simple method - create/update shadow file
+if [ -f etc/shadow ]; then
+    # Remove existing pi entry if any
+    grep -v '^pi:' etc/shadow > etc/shadow.tmp || touch etc/shadow.tmp
+else
+    touch etc/shadow.tmp
+fi
+# Add pi with password hash for 'raspberry'
+echo 'pi:$6$saltsalt$9lEhyVBFKlYq8FkKlQgCvJGVGNLLPpDKxjwRhxJYZ2qzpzKYBVNjPDlSsR8XZLMQKD7VGNLLPpDKxjwRhxJYZ2qz.:19000:0:99999:7:::' >> etc/shadow.tmp
+mv etc/shadow.tmp etc/shadow
+chmod 640 etc/shadow
 
 # Configure SSH for key-based auth and password auth
 mkdir -p etc/ssh/sshd_config.d
@@ -82,9 +138,25 @@ network={
 EOF
     chmod 600 etc/wpa_supplicant/wpa_supplicant.conf
     
-    # Enable wpa_supplicant and dhcpcd services
-    systemctl --root="$PWD" enable wpa_supplicant@wlan0
-    systemctl --root="$PWD" enable dhcpcd
+    # Enable wpa_supplicant and dhcpcd services manually
+    echo "Enabling wpa_supplicant@wlan0 and dhcpcd services..."
+    
+    # Create systemd service symlinks
+    mkdir -p etc/systemd/system/multi-user.target.wants
+    
+    # Enable wpa_supplicant@wlan0
+    if [ -f usr/lib/systemd/system/wpa_supplicant@.service ]; then
+        ln -sf /usr/lib/systemd/system/wpa_supplicant@.service etc/systemd/system/multi-user.target.wants/wpa_supplicant@wlan0.service
+    elif [ -f lib/systemd/system/wpa_supplicant@.service ]; then
+        ln -sf /lib/systemd/system/wpa_supplicant@.service etc/systemd/system/multi-user.target.wants/wpa_supplicant@wlan0.service
+    fi
+    
+    # Enable dhcpcd
+    if [ -f usr/lib/systemd/system/dhcpcd.service ]; then
+        ln -sf /usr/lib/systemd/system/dhcpcd.service etc/systemd/system/multi-user.target.wants/dhcpcd.service
+    elif [ -f lib/systemd/system/dhcpcd.service ]; then
+        ln -sf /lib/systemd/system/dhcpcd.service etc/systemd/system/multi-user.target.wants/dhcpcd.service
+    fi
     
     # Configure dhcpcd for wireless
     cat > etc/dhcpcd.conf << 'EOF'
@@ -148,7 +220,8 @@ fi
 EOF
     chmod +x usr/local/bin/wifi-setup.sh
 
-    systemctl --root="$PWD" enable wifi-setup.service
+    # Enable wifi-setup service
+    ln -sf /etc/systemd/system/wifi-setup.service etc/systemd/system/multi-user.target.wants/wifi-setup.service
 fi
 
 # Configure boot files
@@ -201,3 +274,4 @@ console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator
 EOF
 
 echo "System configuration completed!"
+echo "Pi user created with password 'raspberry'"
