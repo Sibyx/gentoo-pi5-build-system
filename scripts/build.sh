@@ -32,15 +32,19 @@ trap cleanup EXIT
 
 # Build stages
 echo ""
-echo "Stage 1: Building Linux kernel..."
-/build/scripts/build-kernel.sh
-
-echo ""
-echo "Stage 2: Building root filesystem..."
+echo "Stage 1: Building root filesystem..."
 /build/scripts/build-rootfs.sh
 
 echo ""
-echo "Stage 3: Creating SD card image..."
+echo "Stage 2: Building Linux kernel..."
+/build/scripts/build-kernel.sh
+
+echo ""
+echo "Stage 3: System configuration..."
+/build/scripts/configure-system.sh
+
+echo ""
+echo "Stage 4: Creating SD card image..."
 /build/scripts/create-image.sh
 
 echo ""
