@@ -136,7 +136,7 @@ The build process consists of three stages:
 ```bash
 docker run --privileged --rm \
   -v $(pwd)/output:/build/output \
-  -e KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.1.tar.xz" \
+  -e KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.15.7.tar.xz" \
   -e WIFI_SSID="YourNetwork" \
   -e WIFI_PASSWORD="YourPassword" \
   gentoo-rpi5-builder
@@ -146,7 +146,7 @@ docker run --privileged --rm \
 ```bash
 docker run --privileged --rm \
   -v $(pwd)/output:/build/output \
-  -e KERNEL_URL="https://github.com/raspberrypi/linux/archive/refs/heads/rpi-6.6.y.tar.gz" \
+  -e KERNEL_URL="https://github.com/raspberrypi/linux/archive/refs/heads/rpi-6.16.y.tar.gz" \
   -e WIFI_SSID="YourNetwork" \
   -e WIFI_PASSWORD="YourPassword" \
   gentoo-rpi5-builder

@@ -4,8 +4,7 @@ set -euo pipefail
 echo "=== Building Linux Kernel for Raspberry Pi 5 ==="
 
 KERNEL_DIR="/build/kernel"
-KERNEL_URL="${KERNEL_URL:-https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.47.tar.xz}"
-KERNEL_URL="${KERNEL_URL:-https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.47.tar.xz}"
+KERNEL_URL="${KERNEL_URL:-https://github.com/raspberrypi/linux/archive/rpi-6.15.y.tar.gz}"
 JOBS="$(nproc)"
 
 echo "Using kernel URL: $KERNEL_URL"

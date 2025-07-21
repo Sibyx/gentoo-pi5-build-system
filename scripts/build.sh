@@ -52,7 +52,7 @@ ls -lh /build/output/gentoo-rpi5.img*
 
 echo ""
 echo "Build summary:"
-echo "- Kernel: Linux ${KERNEL_VERSION:-6.6.47} with WiFi drivers"
+echo "- Kernel: Linux ${KERNEL_VERSION:-6.15.7} with WiFi drivers"
 echo "- Root filesystem: Gentoo ARM64"
 echo "- WiFi SSID: ${WIFI_SSID:-Not configured}"
 echo "- SSH: Enabled (pi/raspberry)"
