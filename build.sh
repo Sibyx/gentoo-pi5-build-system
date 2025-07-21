@@ -109,7 +109,7 @@ docker run --privileged --rm \
     "$IMAGE_NAME"
 
 echo ""
-echo "=== Build Complete ==="
+echo "=== Build Complete === 🌸"
 echo "Output files:"
 ls -lh "$OUTPUT_DIR"/*.img* 2>/dev/null || echo "No image files found in output directory"
 
