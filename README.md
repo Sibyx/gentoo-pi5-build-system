@@ -12,14 +12,34 @@ A Docker-based cross-compilation build system for generating bootable Gentoo Lin
 
 ## Quick Start
 
+### Option 1: Using the wrapper script (recommended)
+```bash
+./build.sh --ssid "YourWiFiNetwork" --password "YourWiFiPassword"
+```
+
+### Option 2: Direct Docker commands
+
 1. **Build the Docker image:**
    ```bash
    docker build -t gentoo-rpi5-builder .
    ```
 
 2. **Run the build with WiFi credentials:**
+   
+   **Universal command (works on all platforms):**
    ```bash
    docker run --privileged --rm \
+     -v $(pwd)/output:/build/output \
+     -e WIFI_SSID="YourWiFiNetwork" \
+     -e WIFI_PASSWORD="YourWiFiPassword" \
+     -e WIFI_COUNTRY="US" \
+     gentoo-rpi5-builder
+   ```
+   
+   **For Apple Silicon Macs (optimal performance):**
+   ```bash
+   docker run --privileged --rm \
+     --platform linux/arm64 \
      -v $(pwd)/output:/build/output \
      -e WIFI_SSID="YourWiFiNetwork" \
      -e WIFI_PASSWORD="YourWiFiPassword" \
@@ -139,6 +159,76 @@ The build process consists of four sequential stages:
     └── gentoo-rpi5.img.xz     # Compressed image
 ```
 
+## Docker Execution Details
+
+### Required Docker Flags for Image Creation
+
+The image creation process requires specific Docker privileges:
+
+**Essential flags:**
+- `--privileged` - Required for loop device operations and filesystem mounting
+- `-v $(pwd)/output:/build/output` - Mount output directory for generated images
+
+**Platform optimization:**
+- `--platform linux/arm64` - Ensures ARM64 execution on Apple Silicon (optional but recommended)
+
+**Alternative privilege flags (if --privileged doesn't work):**
+- `--cap-add=SYS_ADMIN` - Administrative capabilities
+- `--cap-add=MKNOD` - Device node creation
+- `--device-cgroup-rule='c *:* rmw'` - Broad device access
+
+### Troubleshooting Docker Issues
+
+**If loop device creation fails:**
+```bash
+# Check if loop devices are available in container
+docker run --privileged --rm gentoo-rpi5-builder ls -la /dev/loop*
+
+# Check loop device support
+docker run --privileged --rm gentoo-rpi5-builder losetup -f
+
+# Test with maximum privileges (for macOS)
+docker run --privileged --rm \
+  --platform linux/arm64 \
+  --cap-add=ALL \
+  --security-opt apparmor=unconfined \
+  --security-opt seccomp=unconfined \
+  -v /dev:/dev \
+  -v $(pwd)/output:/build/output \
+  gentoo-rpi5-builder
+
+# For macOS: Ensure Docker Desktop has privileged container support
+# Docker Desktop > Settings > Docker Engine > Add: "features": {"buildkit": true}
+```
+
+**If permission errors occur:**
+```bash
+# Ensure output directory exists and is writable
+mkdir -p output
+chmod 755 output
+
+# Run with user namespace mapping
+docker run --privileged --rm \
+  --userns=host \
+  -v $(pwd)/output:/build/output \
+  gentoo-rpi5-builder
+```
+
+**For Docker Desktop on macOS:**
+```bash
+# Ensure privileged containers are enabled in Docker Desktop
+# Docker Desktop > Settings > Features in Development > Enable host networking
+
+# Verify loop device support in container
+docker run --privileged --rm --platform linux/arm64 \
+  alpine:latest sh -c "ls -la /dev/loop* && losetup -f"
+
+# Alternative: Use Lima, Colima, or OrbStack for better Linux compatibility
+colima start --cpu 4 --memory 8 --arch aarch64
+# or
+orbstack
+```
+
 ## Advanced Usage
 
 ### Custom Kernel Sources
@@ -226,11 +316,39 @@ See `.github/ENVIRONMENT_SETUP.md` for configuration details.
 
 ## Requirements
 
-- **Host**: macOS/Linux with Docker (ARM64 recommended for best performance)
-- **Target**: Raspberry Pi 5
-- **Storage**: 8GB+ SD card
-- **Network**: 2.4GHz or 5GHz WiFi
-- **GitHub Actions**: ARM runners for CI/CD builds
+### Host System Requirements
+- **macOS**: Intel or Apple Silicon with Docker Desktop
+- **Linux**: x86_64 or ARM64 with Docker
+- **Memory**: 8GB+ RAM recommended
+- **Disk**: 15GB+ free space for build process
+- **Docker**: Version 20.10+ with privileged container support
+
+### Target Hardware
+- **Device**: Raspberry Pi 5
+- **Storage**: 8GB+ SD card (Class 10 or better)
+- **Network**: 2.4GHz or 5GHz WiFi network
+
+### Platform-Specific Notes
+
+**macOS (Apple Silicon M1/M2/M3):**
+- ✅ **Fully supported** - Native ARM64 compilation provides best performance
+- Requires `--platform linux/arm64` flag for optimal performance
+- Docker Desktop privileged containers must be enabled
+
+**macOS (Intel):**
+- ✅ **Supported** - Uses emulation (slower but functional)
+- Same Docker flags as Apple Silicon
+
+**Linux (x86_64/ARM64):**
+- ✅ **Fully supported** - Native execution with best compatibility
+- Standard `--privileged` flag usually sufficient
+- Direct loop device access
+
+**Key Point:** The build system uses a universal image creation method that works inside any Docker container on all host platforms including macOS. No special loop device management or host privileges are required.
+
+**GitHub Actions:**
+- ARM runners for CI/CD builds
+- Automated matrix builds for multiple kernel versions
 
 ## Contributing 🌸
 

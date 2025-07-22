@@ -49,11 +49,11 @@ jobs:
             ENVS="${{ github.event.inputs.environments }}"
           else
             # Default environments for automatic builds
-            ENVS="linux-6.15.7,linux-raspi-6.15.y"
+            ENVS="linux-raspi-6.15.y"
           fi
           
           # Convert comma-separated list to JSON array
-          ENV_ARRAY=$(echo "$ENVS" | tr ',' '\n' | jq -R . | jq -s .)
+          ENV_ARRAY=$(echo "$ENVS" | tr ',' '\n' | jq -R . | jq -s . | jq -c .)
           echo "matrix={\"environment\": $ENV_ARRAY}" >> $GITHUB_OUTPUT
 
   build-images:

@@ -17,7 +17,7 @@ This is a Docker-based cross-compilation build system for creating bootable Gent
 ./build.sh --ssid "YourNetwork" --password "YourPassword"
 ```
 
-**Note:** The wrapper script `./build.sh` may not exist in the current implementation. Use the direct Docker commands instead.
+**Note:** The wrapper script `./build.sh` is available and provides the recommended build method.
 
 **Direct Docker build:**
 ```bash
@@ -118,8 +118,8 @@ The build process consists of four sequential stages orchestrated by `scripts/bu
 
 ## Critical Implementation Details
 
-### Loop Device Management
-The image creation requires privileged container access for loop devices. Cleanup handlers in `scripts/build.sh` ensure proper unmounting and device detachment.
+### Universal Image Creation
+The image creation uses a universal method that works on all host platforms (macOS, Linux, GitHub Actions) by creating temporary filesystem images and assembling them with offset-based dd operations. This approach eliminates host loop device dependencies while maintaining full compatibility.
 
 ### WiFi Configuration
 WiFi setup uses wpa_supplicant with systemd integration. Configuration files are generated dynamically in `configure-system.sh` based on environment variables.
