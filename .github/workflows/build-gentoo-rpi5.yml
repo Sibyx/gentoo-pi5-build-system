@@ -20,11 +20,6 @@ on:
         required: false
         type: string
         default: ''
-      environments:
-        description: 'Kernel environments to build (comma-separated)'
-        required: false
-        default: 'linux-6.15.7,linux-raspi-6.15.y'
-        type: string
       enable_debug:
         description: 'Enable IWLWIFI debug logging'
         required: false
@@ -35,35 +30,10 @@ env:
   DOCKER_BUILDKIT: 1
 
 jobs:
-  prepare-matrix:
-    name: Prepare Build Matrix
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Set kernel environments matrix
-        id: set-matrix
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.environments }}" ]; then
-            # Manual dispatch with specific environments
-            ENVS="${{ github.event.inputs.environments }}"
-          else
-            # Default environments for automatic builds
-            ENVS="linux-raspi-6.15.y"
-          fi
-          
-          # Convert comma-separated list to JSON array
-          ENV_ARRAY=$(echo "$ENVS" | tr ',' '\n' | jq -R . | jq -s . | jq -c .)
-          echo "matrix={\"environment\": $ENV_ARRAY}" >> $GITHUB_OUTPUT
-
-  build-images:
-    name: Build ${{ matrix.environment }}
+  build-gentoo-rpi5:
+    name: Build Gentoo RPi5 (linux-raspi-6.15.y)
     runs-on: ubuntu-latest-arm64
-    needs: prepare-matrix
-    environment: ${{ matrix.environment }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+    environment: linux-raspi-6.15.y
     
     steps:
       - name: Checkout repository
@@ -74,7 +44,6 @@ jobs:
         run: |
           echo "timestamp=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
           echo "short_sha=${GITHUB_SHA:0:8}" >> $GITHUB_OUTPUT
-          echo "safe_env_name=$(echo '${{ matrix.environment }}' | tr '.' '-')" >> $GITHUB_OUTPUT
 
       - name: Determine kernel URL
         id: kernel-config
@@ -93,8 +62,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          echo "Building Docker image for ${{ matrix.environment }}..."
-          docker build -t gentoo-rpi5-builder:${{ steps.build-info.outputs.safe_env_name }} .
+          echo "Building Docker image..."
+          docker build -t gentoo-rpi5-builder .
 
       - name: Execute build process
         env:
@@ -105,7 +74,7 @@ jobs:
           STAGE3_URL: ${{ vars.STAGE3_URL }}
           IWLWIFI_DEBUG: ${{ github.event.inputs.enable_debug == 'true' && '1' || '0' }}
         run: |
-          echo "Starting build process for kernel environment: ${{ matrix.environment }}"
+          echo "Starting build process for linux-raspi-6.15.y"
           echo "Kernel URL (${{ steps.kernel-config.outputs.kernel_source }}): ${KERNEL_URL:-default}"
           mkdir -p output
           
@@ -118,16 +87,16 @@ jobs:
             -e KERNEL_URL="${KERNEL_URL}" \
             -e STAGE3_URL="${STAGE3_URL}" \
             -e IWLWIFI_DEBUG="${IWLWIFI_DEBUG}" \
-            gentoo-rpi5-builder:${{ steps.build-info.outputs.safe_env_name }}
+            gentoo-rpi5-builder
 
       - name: Generate build report
         if: always()
         run: |
-          echo "Generating build report for ${{ matrix.environment }}..."
-          cat > build-report-${{ steps.build-info.outputs.safe_env_name }}.md << 'EOF'
-          # Build Report: ${{ matrix.environment }}
+          echo "Generating build report..."
+          cat > build-report.md << 'EOF'
+          # Build Report: linux-raspi-6.15.y
           
-          **Kernel Environment:** ${{ matrix.environment }}
+          **Kernel Environment:** linux-raspi-6.15.y
           **Timestamp:** ${{ steps.build-info.outputs.timestamp }}
           **Git SHA:** ${{ steps.build-info.outputs.short_sha }}
           **Debug Mode:** ${{ github.event.inputs.enable_debug == 'true' && 'Enabled' || 'Disabled' }}
@@ -144,35 +113,35 @@ jobs:
           EOF
           
           if [ -d "output" ] && [ "$(ls -A output)" ]; then
-            ls -la output/ >> build-report-${{ steps.build-info.outputs.safe_env_name }}.md
+            ls -la output/ >> build-report.md
           else
-            echo "No output files generated" >> build-report-${{ steps.build-info.outputs.safe_env_name }}.md
+            echo "No output files generated" >> build-report.md
           fi
 
       - name: Package build artifacts
         if: success()
         run: |
-          echo "Packaging artifacts for ${{ matrix.environment }}..."
+          echo "Packaging artifacts..."
           cd output
           
-          # Rename image file to include kernel version and commit
+          # Rename image file to include commit
           if [ -f "gentoo-rpi5.img.xz" ]; then
-            mv gentoo-rpi5.img.xz gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz
+            mv gentoo-rpi5.img.xz gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz
           fi
           
           # Create checksum file
-          if [ -f "gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz" ]; then
-            sha256sum gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz > gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz.sha256
+          if [ -f "gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz" ]; then
+            sha256sum gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz > gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz.sha256
           fi
 
       - name: Upload SD card image
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}
+          name: gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}
           path: |
-            output/gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz
-            output/gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz.sha256
+            output/gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz
+            output/gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz.sha256
           retention-days: 30
           compression-level: 0
 
@@ -180,16 +149,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}
-          path: |
-            build-${{ steps.build-info.outputs.safe_env_name }}.log
-            build-report-${{ steps.build-info.outputs.safe_env_name }}.md
+          name: build-logs-${{ steps.build-info.outputs.short_sha }}
+          path: build-report.md
           retention-days: 14
 
       - name: Update job summary
         if: always()
         run: |
-          echo "## Build Summary: ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Summary: linux-raspi-6.15.y" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp:** ${{ steps.build-info.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
@@ -200,8 +167,8 @@ jobs:
             echo "🌸 **Build completed successfully! Sakura-chan in her cute skirt approves!** ✨" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Generated Artifacts:**" >> $GITHUB_STEP_SUMMARY
-            echo "- SD Card Image: \`gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz\`" >> $GITHUB_STEP_SUMMARY
-            echo "- SHA256 Checksum: \`gentoo-rpi5-${{ steps.build-info.outputs.safe_env_name }}-${{ steps.build-info.outputs.short_sha }}.img.xz.sha256\`" >> $GITHUB_STEP_SUMMARY
+            echo "- SD Card Image: \`gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz\`" >> $GITHUB_STEP_SUMMARY
+            echo "- SHA256 Checksum: \`gentoo-rpi5-raspi-6.15.y-${{ steps.build-info.outputs.short_sha }}.img.xz.sha256\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
             echo "- Kernel URL: ${{ steps.kernel-config.outputs.kernel_url || 'Default' }} (${{ steps.kernel-config.outputs.kernel_source }})" >> $GITHUB_STEP_SUMMARY
