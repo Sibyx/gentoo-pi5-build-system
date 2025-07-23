@@ -32,7 +32,7 @@ env:
 jobs:
   setup:
     name: 🔧 Setup Build Environment
-    runs-on: ubuntu-latest-arm64
+    runs-on: ubuntu-24.04-arm
     environment: linux-raspi-6.15.y
     outputs:
       timestamp: ${{ steps.metadata.outputs.timestamp }}
@@ -85,7 +85,7 @@ jobs:
 
   build-docker:
     name: 🐳 Build Docker Image
-    runs-on: ubuntu-latest-arm64
+    runs-on: ubuntu-24.04-arm
     needs: setup
     steps:
       - name: Checkout repository
@@ -107,7 +107,7 @@ jobs:
 
   build-gentoo:
     name: 🌸 Build Gentoo RPi5 System
-    runs-on: ubuntu-latest-arm64
+    runs-on: ubuntu-24.04-arm
     environment: linux-raspi-6.15.y
     needs: [setup, build-docker]
     steps:
@@ -181,7 +181,7 @@ jobs:
 
   package-artifacts:
     name: 📦 Package Build Artifacts
-    runs-on: ubuntu-latest-arm64
+    runs-on: ubuntu-24.04-arm
     needs: [setup, build-gentoo]
     if: success()
     steps:
