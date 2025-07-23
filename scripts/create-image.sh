@@ -3,6 +3,7 @@ set -euo pipefail
 
 echo "=== Creating SD Card Image (Universal Method) ==="
 
+FIRMWARE_URL="https://github.com/raspberrypi/firmware/archive/refs/heads/master.tar.gz"
 OUTPUT_DIR="/build/output"
 ROOTFS_DIR="/build/rootfs"
 IMAGE_FILE="$OUTPUT_DIR/gentoo-rpi5.img"
@@ -120,7 +121,11 @@ echo "Installing Raspberry Pi firmware..."
 FIRMWARE_DIR="/tmp/firmware"
 if [ ! -d "$FIRMWARE_DIR" ]; then
     echo "Downloading Raspberry Pi firmware..."
-    git clone --depth=1 --single-branch https://github.com/raspberrypi/firmware.git "$FIRMWARE_DIR"
+    mkdir -p "$FIRMWARE_DIR"
+    wget -q --show-progress -O "/tmp/firmware.tar.gz" "$FIRMWARE_URL"
+    tar -xzf "/tmp/firmware.tar.gz" -C "/tmp" --strip-components=1
+    mv "/tmp/boot" "$FIRMWARE_DIR/"
+    rm -f "/tmp/firmware.tar.gz"
 fi
 
 # Copy essential firmware files
