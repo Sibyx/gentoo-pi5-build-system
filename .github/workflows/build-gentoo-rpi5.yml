@@ -27,6 +27,7 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
+  REGISTRY: ghcr.io
   IMAGE_NAME: gentoo-rpi5-builder
 
 jobs:
@@ -84,26 +85,59 @@ jobs:
           echo "  • Debug Mode: ${{ github.event.inputs.enable_debug == 'true' && 'Enabled' || 'Disabled' }}"
 
   build-docker:
-    name: 🐳 Build Docker Image
+    name: 🐳 Build and Push Docker Image
     runs-on: ubuntu-24.04-arm
     needs: setup
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Build Docker image
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ needs.setup.outputs.short_sha }}
+            
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Output image info
         run: |
-          echo "🐳 Building Docker image..."
-          echo "Using DOCKER_BUILDKIT=$DOCKER_BUILDKIT"
-          
-          docker build \
-            --progress=plain \
-            --tag $IMAGE_NAME:latest \
-            --tag $IMAGE_NAME:${{ needs.setup.outputs.short_sha }} \
-            .
-          
-          echo "✅ Docker image built successfully"
-          docker images $IMAGE_NAME
+          echo "✅ Docker image built and pushed successfully"
+          echo "📦 Image: ${{ steps.meta.outputs.image }}"
+          echo "🔍 Digest: ${{ steps.build.outputs.digest }}"
+          echo "🏷️ Tags: ${{ steps.meta.outputs.tags }}"
 
   build-gentoo:
     name: 🌸 Build Gentoo RPi5 System
@@ -119,6 +153,13 @@ jobs:
           echo "📁 Creating output directory..."
           mkdir -p output
           ls -la
+          
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Run Gentoo build process
         env:
@@ -138,6 +179,11 @@ jobs:
           echo "  IWLWIFI_DEBUG=${IWLWIFI_DEBUG}"
           echo ""
           
+          # Pull the pre-built Docker image
+          IMAGE_WITH_REGISTRY="${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.short_sha }}"
+          echo "🐳 Pulling Docker image: $IMAGE_WITH_REGISTRY"
+          docker pull "$IMAGE_WITH_REGISTRY"
+          
           echo "🐳 Starting Docker container..."
           docker run \
             --privileged \
@@ -150,7 +196,7 @@ jobs:
             --env KERNEL_URL="${KERNEL_URL}" \
             --env STAGE3_URL="${STAGE3_URL}" \
             --env IWLWIFI_DEBUG="${IWLWIFI_DEBUG}" \
-            $IMAGE_NAME:${{ needs.setup.outputs.short_sha }}
+            "$IMAGE_WITH_REGISTRY"
           
           echo "✅ Build process completed"
           
