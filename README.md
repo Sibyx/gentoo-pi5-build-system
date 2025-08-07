@@ -1,6 +1,10 @@
-# Gentoo Raspberry Pi 5 Build System
+# Gentoo Raspberry Pi 5 Build System 🌸
 
-A Docker-based cross-compilation build system for generating bootable Gentoo Linux SD card images for Raspberry Pi 5 with automatic WiFi configuration and SSH access.
+A comprehensive Docker-based cross-compilation system for building bootable Gentoo Linux images for Raspberry Pi 5. Features WiFi auto-configuration, SSH access, and QEMU emulation support for testing and development.
+
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#)
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](docs/README.md)
+[![QEMU Support](https://img.shields.io/badge/QEMU-supported-blue.svg)](#emulation)
 
 ## Features
 
@@ -54,7 +58,20 @@ A Docker-based cross-compilation build system for generating bootable Gentoo Lin
    # or use balenaEtcher with the .xz file
    ```
 
-4. **Boot and connect:**
+4. **Test with QEMU (optional):**
+   ```bash
+   # Install QEMU (if not installed)
+   brew install qemu  # macOS
+   # or: sudo apt install qemu-system-arm  # Ubuntu/Debian
+   
+   # Test boot in emulation
+   ./emulate.sh
+   
+   # Debug boot issues
+   ./emulate.sh debug
+   ```
+
+5. **Boot and connect:**
    - Insert SD card into Raspberry Pi 5 and power on
    - The Pi will automatically connect to WiFi and be available at `rpi5-gentoo.local`
    - SSH access: `ssh pi@rpi5-gentoo.local` (password: `raspberry`)
@@ -142,21 +159,33 @@ The build process consists of four sequential stages:
 ## File Structure
 
 ```
-├── Dockerfile                 # Gentoo ARM64 build environment
-├── build.sh                   # Host wrapper script with argument parsing
+├── build.sh                   # 🔧 Main build script
+├── emulate.sh                 # 🧪 QEMU emulation system
+├── Dockerfile                 # 🐳 Gentoo ARM64 build environment
 ├── .github/
 │   ├── workflows/
-│   │   └── build-gentoo-rpi5.yml  # GitHub Actions CI/CD pipeline
-│   └── ENVIRONMENT_SETUP.md   # GitHub environment configuration guide
+│   │   └── build-gentoo-rpi5.yml  # 🤖 CI/CD pipeline
+│   └── ENVIRONMENT_SETUP.md   # ⚙️  GitHub environment setup
 ├── scripts/
-│   ├── build.sh               # Main build orchestrator (runs inside container)
-│   ├── build-rootfs.sh        # Stage 1: Root filesystem extraction
-│   ├── build-kernel.sh        # Stage 2: Kernel compilation
-│   ├── configure-system.sh    # Stage 3: System configuration
-│   └── create-image.sh        # Stage 4: Image creation
-└── output/                    # Build artifacts (created during build)
-    ├── gentoo-rpi5.img        # Raw SD card image
-    └── gentoo-rpi5.img.xz     # Compressed image
+│   ├── common.sh              # 🔨 Shared functions and utilities
+│   ├── build.sh               # 📋 Build orchestrator (container)
+│   ├── build-rootfs.sh        # 🏗️  Stage 1: Root filesystem
+│   ├── build-kernel.sh        # ⚙️  Stage 2: Kernel compilation
+│   ├── configure-system.sh    # 🔧 Stage 3: System configuration
+│   └── create-image.sh        # 💾 Stage 4: Image creation
+├── docs/
+│   ├── README.md              # 📚 Documentation index
+│   ├── QUICKSTART.md          # 🚀 Quick start guide
+│   └── EMULATION.md           # 🧪 QEMU emulation guide
+├── output/                    # 📁 Build artifacts (generated)
+│   ├── gentoo-rpi5.img        # 💽 Raw SD card image
+│   └── gentoo-rpi5.img.xz     # 📦 Compressed image
+└── emulation/                 # 🧪 QEMU working files (generated)
+    ├── gentoo-work.img        # 💾 Working copy for emulation
+    └── extracted/             # 📂 Extracted boot files
+        ├── kernel8.img        # ⚙️  ARM64 kernel
+        ├── cmdline.txt        # 📝 Kernel parameters
+        └── config.txt         # ⚙️  Boot configuration
 ```
 
 ## Docker Execution Details
@@ -289,6 +318,63 @@ docker run --privileged --rm \
   -e WIFI_PASSWORD="YourPassword" \
   gentoo-rpi5-builder
 ```
+
+## Emulation
+
+Test your built images without physical hardware using QEMU ARM64 emulation:
+
+### Quick Start
+```bash
+# Test normal boot
+./emulate.sh
+
+# Debug boot issues
+./emulate.sh debug
+
+# Boot with monitor access
+./emulate.sh monitor
+```
+
+### Installation
+```bash
+# macOS
+brew install qemu
+
+# Ubuntu/Debian
+sudo apt install qemu-system-arm
+
+# Arch Linux
+sudo pacman -S qemu-system-aarch64
+```
+
+### Features
+- **Multiple boot modes**: Normal, debug, and monitor modes
+- **Network access**: SSH forwarding on port 2222
+- **Snapshot support**: Test changes without affecting the base image
+- **Boot file extraction**: Analyze kernel and configuration files
+- **Performance tuning**: Configurable CPU cores and memory
+
+### Usage Examples
+```bash
+# Build image with custom configuration
+STAGE3_URL=https://distfiles.gentoo.org/releases/arm64/autobuilds/20250803T232237Z/stage3-arm64-musl-20250803T232237Z.tar.xz \
+KERNEL_URL=https://github.com/raspberrypi/linux/archive/rpi-6.16.y.tar.gz \
+./build.sh --ssid "Kapucinska 1 5 9" --password "smecarovni"
+
+# Custom configuration
+./emulate.sh -m 8G -c 8 boot
+
+# Snapshot mode (no changes saved)
+./emulate.sh --snapshot debug
+
+# SSH access (when booted)
+ssh -p 2222 pi@localhost
+
+# Extract boot files for analysis
+./emulate.sh extract
+```
+
+See [docs/EMULATION.md](docs/EMULATION.md) for comprehensive emulation documentation.
 
 ## Security Considerations
 

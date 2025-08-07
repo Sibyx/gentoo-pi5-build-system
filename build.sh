@@ -2,9 +2,11 @@
 set -euo pipefail
 
 # Gentoo Raspberry Pi 5 Image Builder
-# Quick build script for macOS hosts
+# Cross-platform build script with Docker support
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/scripts/common.sh"
+
 IMAGE_NAME="gentoo-rpi5-builder"
 
 # Default values
@@ -109,14 +111,30 @@ docker run --privileged --rm \
     "$IMAGE_NAME"
 
 echo ""
-echo "=== Build Complete === 🌸"
-echo "Output files:"
+print_sakura "Build Complete!"
+echo "📁 Output files:"
 ls -lh "$OUTPUT_DIR"/*.img* 2>/dev/null || echo "No image files found in output directory"
 
 echo ""
-echo "To flash the image:"
+print_status "Next steps:"
+echo "🧪 Test with emulation:"
+echo "  ./emulate.sh           # Boot normally"
+echo "  ./emulate.sh debug     # Debug boot issues"
+
+echo ""
+echo "💾 Flash to SD card:"
 echo "  dd if=$OUTPUT_DIR/gentoo-rpi5.img of=/dev/sdX bs=4M status=progress"
 echo "  or use balenaEtcher with gentoo-rpi5.img.xz"
+
 echo ""
-echo "Default login: pi/raspberry"
-echo "SSH access: ssh pi@rpi5-gentoo.local"
+echo "🔐 Default credentials:"
+echo "  Username: pi"
+echo "  Password: raspberry"
+
+echo ""
+echo "🌐 Network access:"
+echo "  SSH: ssh pi@rpi5-gentoo.local"
+echo "  WiFi: $WIFI_SSID (${WIFI_COUNTRY:-US})"
+
+echo ""
+print_info "Documentation: docs/README.md"

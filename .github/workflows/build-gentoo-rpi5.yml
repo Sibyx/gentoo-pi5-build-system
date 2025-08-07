@@ -238,6 +238,14 @@ jobs:
             exit 1
           fi
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gentoo-build-output-${{ needs.setup.outputs.short_sha }}
+          path: output/
+          retention-days: 1
+          if-no-files-found: error
+
   package-artifacts:
     name: 📦 Package Build Artifacts
     runs-on: ubuntu-24.04-arm
@@ -247,25 +255,30 @@ jobs:
       - name: Create output directory
         run: mkdir -p output
           
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: gentoo-build-output-${{ needs.setup.outputs.short_sha }}
+          path: build-output/
+          
       - name: Rename and package artifacts
         run: |
           echo "📦 Packaging artifacts..."
           cd output
           
-          # The build-gentoo job should have created files in the shared workspace
           echo "📁 Available files from build:"
-          ls -lah ../
+          ls -lah ../build-output/
           
-          # Copy files from the previous job's workspace
-          if [ -f "../output/gentoo-rpi5.img.xz" ]; then
+          # Copy and rename files from the downloaded artifacts
+          if [ -f "../build-output/gentoo-rpi5.img.xz" ]; then
             NEW_NAME="gentoo-rpi5-raspi-6.15.y-${{ needs.setup.outputs.short_sha }}.img.xz"
             echo "📝 Copying and renaming: gentoo-rpi5.img.xz → $NEW_NAME"
-            cp "../output/gentoo-rpi5.img.xz" "$NEW_NAME"
+            cp "../build-output/gentoo-rpi5.img.xz" "$NEW_NAME"
             
             # Update checksum file if it exists
-            if [ -f "../output/gentoo-rpi5.img.xz.sha256" ]; then
+            if [ -f "../build-output/gentoo-rpi5.img.xz.sha256" ]; then
               echo "🔐 Updating checksum file..."
-              sed "s/gentoo-rpi5.img.xz/$NEW_NAME/" "../output/gentoo-rpi5.img.xz.sha256" > "${NEW_NAME}.sha256"
+              sed "s/gentoo-rpi5.img.xz/$NEW_NAME/" "../build-output/gentoo-rpi5.img.xz.sha256" > "${NEW_NAME}.sha256"
             fi
           else
             echo "❌ Build artifacts not found!"
