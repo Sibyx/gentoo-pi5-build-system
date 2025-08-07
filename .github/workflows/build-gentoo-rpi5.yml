@@ -105,11 +105,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           
+      - name: Prepare registry path
+        id: registry
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_path=${{ env.REGISTRY }}/${REPO_LOWER}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
+          
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}
+          images: ${{ steps.registry.outputs.image_path }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -161,6 +167,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
           
+      - name: Prepare Docker image name
+        id: image
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_WITH_REGISTRY="${{ env.REGISTRY }}/${REPO_LOWER}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.short_sha }}"
+          echo "name=${IMAGE_WITH_REGISTRY}" >> $GITHUB_OUTPUT
+          echo "🐳 Docker image: ${IMAGE_WITH_REGISTRY}"
+          
       - name: Run Gentoo build process
         env:
           WIFI_SSID: ${{ vars.WIFI_SSID }}
@@ -180,9 +194,8 @@ jobs:
           echo ""
           
           # Pull the pre-built Docker image
-          IMAGE_WITH_REGISTRY="${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.short_sha }}"
-          echo "🐳 Pulling Docker image: $IMAGE_WITH_REGISTRY"
-          docker pull "$IMAGE_WITH_REGISTRY"
+          echo "🐳 Pulling Docker image: ${{ steps.image.outputs.name }}"
+          docker pull "${{ steps.image.outputs.name }}"
           
           echo "🐳 Starting Docker container..."
           docker run \
@@ -196,7 +209,7 @@ jobs:
             --env KERNEL_URL="${KERNEL_URL}" \
             --env STAGE3_URL="${STAGE3_URL}" \
             --env IWLWIFI_DEBUG="${IWLWIFI_DEBUG}" \
-            "$IMAGE_WITH_REGISTRY"
+            "${{ steps.image.outputs.name }}"
           
           echo "✅ Build process completed"
           
